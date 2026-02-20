@@ -28,7 +28,7 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--add-cloudsql-instances'
-      - '[YOUR_CLOUD_SQL_CONNECTION_NAME]' # Ganti dengan Connection Name dari Console SQL
+      - '$PROJECT_ID:asia-southeast2:scholacbt-db'
 
   # 4. Deploy Frontend to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
