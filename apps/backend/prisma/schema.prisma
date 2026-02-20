@@ -1,0 +1,180 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN       // School Admin
+  TEACHER
+  STUDENT
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ONGOING
+  COMPLETED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  TRIAL
+}
+
+model School {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String?      @unique // for subdomain or url-path
+  address     String?      @db.Text
+  logo        String?
+  status      SubscriptionStatus @default(TRIAL)
+  users       User[]
+  subjects    Subject[]
+  exams       Exam[]
+  subscription Subscription?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([slug])
+}
+
+model Subscription {
+  id        String             @id @default(uuid())
+  schoolId  String             @unique
+  school    School             @relation(fields: [schoolId], references: [id])
+  planName  String             // e.g., Basic, Pro, Enterprise
+  startDate DateTime           @default(now())
+  endDate   DateTime
+  status    SubscriptionStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([schoolId])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(STUDENT)
+  schoolId  String?  // Nullable because SUPER_ADMIN might not belong to a school
+  school    School?  @relation(fields: [schoolId], references: [id])
+  results   ExamResult[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([schoolId])
+}
+
+model Subject {
+  id        String   @id @default(uuid())
+  name      String
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  exams     Exam[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@unique([name, schoolId]) // Each school can have unique subject names
+}
+
+model Exam {
+  id          String      @id @default(uuid())
+  title       String
+  slug        String      
+  description String?     @db.Text
+  subjectId   String
+  subject     Subject     @relation(fields: [subjectId], references: [id])
+  schoolId    String
+  school      School      @relation(fields: [schoolId], references: [id])
+  startTime   DateTime
+  endTime     DateTime
+  duration    Int         // in minutes
+  status      ExamStatus  @default(DRAFT)
+  questions   Question[]
+  results     ExamResult[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([schoolId])
+  @@index([subjectId])
+  @@index([startTime, endTime])
+  @@index([status])
+  @@unique([slug, schoolId]) // Slug unique per school
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  text        String   @db.Text
+  image       String?
+  type        String   @default("MULTIPLE_CHOICE")
+  points      Int      @default(1)
+  examId      String
+  exam        Exam     @relation(fields: [examId], references: [id])
+  options     Option[]
+  answers     UserAnswer[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([examId])
+}
+
+model Option {
+  id          String   @id @default(uuid())
+  text        String
+  isCorrect   Boolean  @default(false)
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id])
+
+  @@index([questionId])
+}
+
+model ExamResult {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  examId      String
+  exam        Exam     @relation(fields: [examId], references: [id])
+  startTime   DateTime @default(now())
+  endTime     DateTime?
+  score       Float    @default(0)
+  isFinished  Boolean  @default(false)
+  answers     UserAnswer[]
+
+  @@index([userId, examId])
+  @@index([examId])
+  @@index([isFinished])
+}
+
+model UserAnswer {
+  id           String     @id @default(uuid())
+  resultId     String
+  result       ExamResult @relation(fields: [resultId], references: [id])
+  questionId   String
+  question     Question   @relation(fields: [questionId], references: [id])
+  selectedOptionId String?
+  essayAnswer   String?    @db.Text
+  isCorrect    Boolean?
+
+  @@index([resultId])
+  @@index([questionId])
+}
+
+
